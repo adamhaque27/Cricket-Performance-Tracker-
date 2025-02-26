@@ -95,6 +95,59 @@ def init_db():
 def hash_password(password):
     return sha256(password.encode()).hexdigest()
 
+# Function to add user to the database
+def add_user(username, password):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('INSERT INTO users (username, password) VALUES (?, ?)', (username, hash_password(password)))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        print("Username already exists")
+    conn.close()
+
+# Function to retrieve user from the database
+def get_user(username):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM users WHERE username=?', (username,))
+    user = cursor.fetchone()
+    conn.close()
+    return user
+
+# Function to print the contents of a table
+def print_table(table_name):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute(f'SELECT * FROM {table_name}')
+    rows = cursor.fetchall()
+    conn.close()
+    print(f"Contents of {table_name}:")
+    for row in rows:
+        print(row)
+
+# Function to print all tables
+def print_all_tables():
+    tables = ['users', 'clubs', 'seasons', 'matches', 'batting_stats', 'bowling_stats', 'over_stats']
+    for table in tables:
+        print_table(table)
+
+# Function to add match results to the database
+def add_match_result(season_id, date, opponent, venue, winning_team, team_scores, batting_stats, bowling_stats):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO matches (season_id, date, opponent, venue, winning_team, team_scores) VALUES (?, ?, ?, ?, ?, ?)',
+                   (season_id, date, opponent, venue, winning_team, team_scores))
+    match_id = cursor.lastrowid
+    for stat in batting_stats:
+        cursor.execute('INSERT INTO batting_stats (match_id, user_id, runs, balls, strike_rate, fours, sixes, not_out) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                       (match_id, stat['user_id'], stat['runs'], stat['balls'], stat['strike_rate'], stat['fours'], stat['sixes'], stat['not_out']))
+    for stat in bowling_stats:
+        cursor.execute('INSERT INTO bowling_stats (match_id, user_id, overs, runs_conceded, wickets, maidens, economy_rate) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                       (match_id, stat['user_id'], stat['overs'], stat['runs_conceded'], stat['wickets'], stat['maidens'], stat['economy_rate']))
+    conn.commit()
+    conn.close()
+
 # Login Screen
 class LoginScreen(Screen):
     def __init__(self, **kwargs):
@@ -159,9 +212,50 @@ class DashboardScreen(Screen):
         super(DashboardScreen, self).__init__(**kwargs)
         layout = BoxLayout(orientation='vertical')
         layout.add_widget(Label(text='Welcome to the Cricket Performance Tracker'))
-        self.add_widget(layout)
-        
 
+        # Section to visualize the database
+        visualize_button = Button(text='Visualize Database')
+        visualize_button.bind(on_press=self.visualize_database)
+        layout.add_widget(visualize_button)
+
+        # Section to enter game results
+        self.season_id = TextInput(hint_text='Season ID', multiline=False)
+        self.date = TextInput(hint_text='Date', multiline=False)
+        self.opponent = TextInput(hint_text='Opponent', multiline=False)
+        self.venue = TextInput(hint_text='Venue', multiline=False)
+        self.winning_team = TextInput(hint_text='Winning Team', multiline=False)
+        self.team_scores = TextInput(hint_text='Team Scores', multiline=False)
+        self.batting_stats = TextInput(hint_text='Batting Stats (JSON)', multiline=False)
+        self.bowling_stats = TextInput(hint_text='Bowling Stats (JSON)', multiline=False)
+        add_result_button = Button(text='Add Match Result')
+        add_result_button.bind(on_press=self.add_match_result)
+        layout.add_widget(self.season_id)
+        layout.add_widget(self.date)
+        layout.add_widget(self.opponent)
+        layout.add_widget(self.venue)
+        layout.add_widget(self.winning_team)
+        layout.add_widget(self.team_scores)
+        layout.add_widget(self.batting_stats)
+        layout.add_widget(self.bowling_stats)
+        layout.add_widget(add_result_button)
+
+        self.add_widget(layout)
+
+    def visualize_database(self, instance):
+        print_all_tables()
+
+    def add_match_result(self, instance):
+        season_id = int(self.season_id.text)
+        date = self.date.text
+        opponent = self.opponent.text
+        venue = self.venue.text
+        winning_team = self.winning_team.text
+        team_scores = self.team_scores.text
+        batting_stats = eval(self.batting_stats.text)
+        bowling_stats = eval(self.bowling_stats.text)
+        add_match_result(season_id, date, opponent, venue, winning_team, team_scores, batting_stats, bowling_stats)
+        popup = Popup(title='Success', content=Label(text='Match result added successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
 # Screen Manager
 class CricketApp(App):
     def build(self):
@@ -174,3 +268,4 @@ class CricketApp(App):
 if __name__ == '__main__':
     init_db()
     CricketApp().run()
+    print_all_tables()
