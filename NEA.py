@@ -160,6 +160,7 @@ class DashboardScreen(Screen):
         layout = BoxLayout(orientation='vertical')
         layout.add_widget(Label(text='Welcome to the Cricket Performance Tracker'))
         self.add_widget(layout)
+        
 
 # Screen Manager
 class CricketApp(App):
