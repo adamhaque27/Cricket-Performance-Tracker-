@@ -227,7 +227,7 @@ def send_reset_email(email, token):
 
     with smtplib.SMTP('smtp.gmail.com', 587) as server:
         server.starttls()
-        server.login('performancecricketstats@gmail.com', 'yourpassword')
+        server.login('performancecricketstats@gmail.com', 'YKW*ptn*ymz4qnw_vke') 
         server.sendmail(msg['From'], [msg['To']], msg.as_string())
 
 # Function to validate reset token
@@ -261,14 +261,15 @@ def update_password(email, new_password):
 def clear_db():
     conn = sqlite3.connect('cricket_tracker.db')
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM users')
-    cursor.execute('DELETE FROM clubs')
-    cursor.execute('DELETE FROM seasons')
-    cursor.execute('DELETE FROM matches')
-    cursor.execute('DELETE FROM batting_stats')
-    cursor.execute('DELETE FROM bowling_stats')
-    cursor.execute('DELETE FROM over_stats')
-    cursor.execute('DELETE FROM reset_tokens')
+    cursor.execute('DROP TABLE IF EXISTS users')
+    cursor.execute('DROP TABLE IF EXISTS clubs')
+    cursor.execute('DROP TABLE IF EXISTS seasons')
+    cursor.execute('DROP TABLE IF EXISTS matches')
+    cursor.execute('DROP TABLE IF EXISTS batting_stats')
+    cursor.execute('DROP TABLE IF EXISTS bowling_stats')
+    cursor.execute('DROP TABLE IF EXISTS over_stats')
+    cursor.execute('DROP TABLE IF EXISTS reset_tokens')
+    cursor.execute('DROP TABLE IF EXISTS club_memberships')
     conn.commit()
     conn.close()
 
@@ -326,6 +327,19 @@ def add_season(club_id, name):
     conn.commit()
     conn.close()
 
+# Global variable to store the current user's ID
+current_user_id = None
+
+# Function to get the current logged-in user's ID
+def get_current_user_id():
+    global current_user_id
+    return current_user_id
+
+# Function to set the current logged-in user's ID
+def set_current_user_id(user_id):
+    global current_user_id
+    current_user_id = user_id
+
 # Class for the login screen
 class LoginScreen(Screen):
     def __init__(self, **kwargs):
@@ -354,6 +368,7 @@ class LoginScreen(Screen):
         user = cursor.fetchone()
         conn.close()
         if user:
+            set_current_user_id(user[0])  # Set the current user's ID
             self.manager.current = 'dashboard'
         else:
             popup = Popup(title='Login Failed', content=Label(text='Invalid username or password'), size_hint=(None, None), size=(400, 200))
@@ -552,7 +567,7 @@ class JoinClubScreen(Screen):
 
     # Function to join a club
     def join_club(self, instance):
-        user_id = get_current_user_id()  # Assume this function gets the current logged-in user's ID
+        user_id = get_current_user_id()  # Get the current logged-in user's ID
         join_club(user_id, int(self.club_id.text))
         popup = Popup(title='Success', content=Label(text='Joined club successfully'), size_hint=(None, None), size=(400, 200))
         popup.open()
@@ -571,7 +586,7 @@ class SwitchClubScreen(Screen):
 
     # Function to switch clubs
     def switch_club(self, instance):
-        user_id = get_current_user_id()  # Assume this function gets the current logged-in user's ID
+        user_id = get_current_user_id()  # Get the current logged-in user's ID
         switch_club(user_id, int(self.new_club_id.text))
         popup = Popup(title='Success', content=Label(text='Switched club successfully'), size_hint=(None, None), size=(400, 200))
         popup.open()
@@ -593,7 +608,7 @@ class CricketApp(App):
 
 # Entry point of the application
 if __name__ == '__main__':
-    init_db()  # Initialise the database
     clear_db()  # Clear any existing data in the database
+    init_db()  # Initialise the database
     CricketApp().run()  # Run the Kivy application
     print_all_tables()  # Print all tables in the database
