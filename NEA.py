@@ -1,3 +1,7 @@
+#Cricket Performance Tracker 
+#Author Adam Haque 
+#Start date: 07/02/2024
+# Import necessary modules from Kivy and other libraries
 import kivy
 from kivy.app import App
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -9,12 +13,16 @@ from kivy.uix.popup import Popup
 import sqlite3
 from hashlib import sha256
 
+# Ensure the Kivy version is at least 2.0.0
 kivy.require('2.0.0')
 
-# Database initialization
+# Database initialisation function
 def init_db():
+    # Connect to the SQLite database
     conn = sqlite3.connect('cricket_tracker.db')
     cursor = conn.cursor()
+    
+    # Create the users table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,12 +30,16 @@ def init_db():
         password TEXT NOT NULL
     )
     ''')
+    
+    # Create the clubs table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS clubs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL
     )
     ''')
+    
+    # Create the seasons table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS seasons (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +48,8 @@ def init_db():
         FOREIGN KEY (club_id) REFERENCES clubs(id)
     )
     ''')
+    
+    # Create the matches table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS matches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,6 +62,8 @@ def init_db():
         FOREIGN KEY (season_id) REFERENCES seasons(id)
     )
     ''')
+    
+    # Create the batting_stats table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS batting_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,6 +79,8 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
     ''')
+    
+    # Create the bowling_stats table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS bowling_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,6 +95,8 @@ def init_db():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )
     ''')
+    
+    # Create the over_stats table if it doesn't exist
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS over_stats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,14 +108,16 @@ def init_db():
         FOREIGN KEY (bowling_stat_id) REFERENCES bowling_stats(id)
     )
     ''')
+    
+    # Commit the changes and close the connection
     conn.commit()
     conn.close()
 
-# Secure password hashing
+# Function to hash passwords using SHA-256
 def hash_password(password):
     return sha256(password.encode()).hexdigest()
 
-# Function to add user to the database
+# Function to add a user to the database
 def add_user(username, password):
     conn = sqlite3.connect('cricket_tracker.db')
     cursor = conn.cursor()
@@ -106,7 +128,7 @@ def add_user(username, password):
         print("Username already exists")
     conn.close()
 
-# Function to retrieve user from the database
+# Function to retrieve a user from the database
 def get_user(username):
     conn = sqlite3.connect('cricket_tracker.db')
     cursor = conn.cursor()
@@ -126,7 +148,7 @@ def print_table(table_name):
     for row in rows:
         print(row)
 
-# Function to print all tables
+# Function to print the contents of all tables
 def print_all_tables():
     tables = ['users', 'clubs', 'seasons', 'matches', 'batting_stats', 'bowling_stats', 'over_stats']
     for table in tables:
@@ -148,7 +170,7 @@ def add_match_result(season_id, date, opponent, venue, winning_team, team_scores
     conn.commit()
     conn.close()
 
-# Login Screen
+# Class for the login screen
 class LoginScreen(Screen):
     def __init__(self, **kwargs):
         super(LoginScreen, self).__init__(**kwargs)
@@ -165,6 +187,7 @@ class LoginScreen(Screen):
         layout.add_widget(register_button)
         self.add_widget(layout)
 
+    # Function to handle login
     def login(self, instance):
         conn = sqlite3.connect('cricket_tracker.db')
         cursor = conn.cursor()
@@ -177,10 +200,11 @@ class LoginScreen(Screen):
             popup = Popup(title='Login Failed', content=Label(text='Invalid username or password'), size_hint=(None, None), size=(400, 200))
             popup.open()
 
+    # Function to switch to the registration screen
     def register(self, instance):
         self.manager.current = 'register'
 
-# Register Screen
+# Class for the registration screen
 class RegisterScreen(Screen):
     def __init__(self, **kwargs):
         super(RegisterScreen, self).__init__(**kwargs)
@@ -194,6 +218,7 @@ class RegisterScreen(Screen):
         layout.add_widget(register_button)
         self.add_widget(layout)
 
+    # Function to handle registration
     def register(self, instance):
         conn = sqlite3.connect('cricket_tracker.db')
         cursor = conn.cursor()
@@ -206,17 +231,17 @@ class RegisterScreen(Screen):
             popup.open()
         conn.close()
 
-# Dashboard Screen
+# Class for the dashboard screen
 class DashboardScreen(Screen):
     def __init__(self, **kwargs):
         super(DashboardScreen, self).__init__(**kwargs)
         layout = BoxLayout(orientation='vertical')
         layout.add_widget(Label(text='Welcome to the Cricket Performance Tracker'))
 
-        # Section to visualize the database
-        visualize_button = Button(text='Visualize Database')
-        visualize_button.bind(on_press=self.visualize_database)
-        layout.add_widget(visualize_button)
+        # Section to visualise the database
+        visualise_button = Button(text='Visualise Database')
+        visualise_button.bind(on_press=self.visualise_database)
+        layout.add_widget(visualise_button)
 
         # Section to enter game results
         self.season_id = TextInput(hint_text='Season ID', multiline=False)
@@ -241,9 +266,11 @@ class DashboardScreen(Screen):
 
         self.add_widget(layout)
 
-    def visualize_database(self, instance):
+    # Function to visualise the database
+    def visualise_database(self, instance):
         print_all_tables()
 
+    # Function to add match results
     def add_match_result(self, instance):
         season_id = int(self.season_id.text)
         date = self.date.text
@@ -256,7 +283,8 @@ class DashboardScreen(Screen):
         add_match_result(season_id, date, opponent, venue, winning_team, team_scores, batting_stats, bowling_stats)
         popup = Popup(title='Success', content=Label(text='Match result added successfully'), size_hint=(None, None), size=(400, 200))
         popup.open()
-# Screen Manager
+
+# Main application class
 class CricketApp(App):
     def build(self):
         sm = ScreenManager()
@@ -265,7 +293,8 @@ class CricketApp(App):
         sm.add_widget(DashboardScreen(name='dashboard'))
         return sm
 
+# Entry point of the application
 if __name__ == '__main__':
-    init_db()
-    CricketApp().run()
-    print_all_tables()
+    init_db()  # Initialise the database
+    CricketApp().run()  # Run the Kivy application
+    print_all_tables()  # Print all tables in the database
