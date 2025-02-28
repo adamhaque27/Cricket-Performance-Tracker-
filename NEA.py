@@ -15,6 +15,7 @@ from hashlib import sha256
 import uuid
 import smtplib
 from email.mime.text import MIMEText
+from datetime import datetime
 
 # Ensure the Kivy version is at least 2.0.0
 kivy.require('2.0.0')
@@ -31,7 +32,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        is_admin INTEGER DEFAULT 0
     )
     ''')
     
@@ -119,6 +121,19 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL,
         token TEXT NOT NULL
+    )
+    ''')
+    
+    # Create the club_memberships table if it doesn't exist
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS club_memberships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        club_id INTEGER,
+        start_date TEXT NOT NULL,
+        end_date TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (club_id) REFERENCES clubs(id)
     )
     ''')
     
@@ -254,6 +269,60 @@ def clear_db():
     cursor.execute('DELETE FROM bowling_stats')
     cursor.execute('DELETE FROM over_stats')
     cursor.execute('DELETE FROM reset_tokens')
+    conn.commit()
+    conn.close()
+
+# Function to join a club
+def join_club(user_id, club_id):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO club_memberships (user_id, club_id, start_date) VALUES (?, ?, ?)', 
+                   (user_id, club_id, datetime.now().strftime('%Y-%m-%d')))
+    conn.commit()
+    conn.close()
+
+# Function to switch clubs
+def switch_club(user_id, new_club_id):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE club_memberships SET end_date=? WHERE user_id=? AND end_date IS NULL', 
+                   (datetime.now().strftime('%Y-%m-%d'), user_id))
+    cursor.execute('INSERT INTO club_memberships (user_id, club_id, start_date) VALUES (?, ?, ?)', 
+                   (user_id, new_club_id, datetime.now().strftime('%Y-%m-%d')))
+    conn.commit()
+    conn.close()
+
+# Function to get current club of a user
+def get_current_club(user_id):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT club_id FROM club_memberships WHERE user_id=? AND end_date IS NULL', (user_id,))
+    club_id = cursor.fetchone()
+    conn.close()
+    return club_id[0] if club_id else None
+
+# Function to get all clubs
+def get_all_clubs():
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM clubs')
+    clubs = cursor.fetchall()
+    conn.close()
+    return clubs
+
+# Function to add a new club (admin only)
+def add_club(name):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO clubs (name) VALUES (?)', (name,))
+    conn.commit()
+    conn.close()
+
+# Function to add a new season (admin only)
+def add_season(club_id, name):
+    conn = sqlite3.connect('cricket_tracker.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO seasons (club_id, name) VALUES (?, ?)', (club_id, name))
     conn.commit()
     conn.close()
 
@@ -431,6 +500,82 @@ class DashboardScreen(Screen):
         popup = Popup(title='Success', content=Label(text='Match result added successfully'), size_hint=(None, None), size=(400, 200))
         popup.open()
 
+# Class for the club management screen (admin only)
+class ClubManagementScreen(Screen):
+    def __init__(self, **kwargs):
+        super(ClubManagementScreen, self).__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical')
+        self.club_name = TextInput(hint_text='Club Name', multiline=False)
+        add_club_button = Button(text='Add Club')
+        add_club_button.bind(on_press=self.add_club)
+        layout.add_widget(self.club_name)
+        layout.add_widget(add_club_button)
+        self.add_widget(layout)
+
+    # Function to add a new club
+    def add_club(self, instance):
+        add_club(self.club_name.text)
+        popup = Popup(title='Success', content=Label(text='Club added successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
+
+# Class for the season management screen (admin only)
+class SeasonManagementScreen(Screen):
+    def __init__(self, **kwargs):
+        super(SeasonManagementScreen, self).__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical')
+        self.club_id = TextInput(hint_text='Club ID', multiline=False)
+        self.season_name = TextInput(hint_text='Season Name', multiline=False)
+        add_season_button = Button(text='Add Season')
+        add_season_button.bind(on_press=self.add_season)
+        layout.add_widget(self.club_id)
+        layout.add_widget(self.season_name)
+        layout.add_widget(add_season_button)
+        self.add_widget(layout)
+
+    # Function to add a new season
+    def add_season(self, instance):
+        add_season(int(self.club_id.text), self.season_name.text)
+        popup = Popup(title='Success', content=Label(text='Season added successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
+
+# Class for the club joining screen
+class JoinClubScreen(Screen):
+    def __init__(self, **kwargs):
+        super(JoinClubScreen, self).__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical')
+        self.club_id = TextInput(hint_text='Club ID', multiline=False)
+        join_club_button = Button(text='Join Club')
+        join_club_button.bind(on_press=self.join_club)
+        layout.add_widget(self.club_id)
+        layout.add_widget(join_club_button)
+        self.add_widget(layout)
+
+    # Function to join a club
+    def join_club(self, instance):
+        user_id = get_current_user_id()  # Assume this function gets the current logged-in user's ID
+        join_club(user_id, int(self.club_id.text))
+        popup = Popup(title='Success', content=Label(text='Joined club successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
+
+# Class for the club switching screen
+class SwitchClubScreen(Screen):
+    def __init__(self, **kwargs):
+        super(SwitchClubScreen, self).__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical')
+        self.new_club_id = TextInput(hint_text='New Club ID', multiline=False)
+        switch_club_button = Button(text='Switch Club')
+        switch_club_button.bind(on_press=self.switch_club)
+        layout.add_widget(self.new_club_id)
+        layout.add_widget(switch_club_button)
+        self.add_widget(layout)
+
+    # Function to switch clubs
+    def switch_club(self, instance):
+        user_id = get_current_user_id()  # Assume this function gets the current logged-in user's ID
+        switch_club(user_id, int(self.new_club_id.text))
+        popup = Popup(title='Success', content=Label(text='Switched club successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
+
 # Main application class
 class CricketApp(App):
     def build(self):
@@ -440,6 +585,10 @@ class CricketApp(App):
         sm.add_widget(DashboardScreen(name='dashboard'))
         sm.add_widget(ResetPasswordScreen(name='reset_password'))
         sm.add_widget(NewPasswordScreen(name='new_password'))
+        sm.add_widget(ClubManagementScreen(name='club_management'))
+        sm.add_widget(SeasonManagementScreen(name='season_management'))
+        sm.add_widget(JoinClubScreen(name='join_club'))
+        sm.add_widget(SwitchClubScreen(name='switch_club'))
         return sm
 
 # Entry point of the application

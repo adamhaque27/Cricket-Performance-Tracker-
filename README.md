@@ -8,7 +8,7 @@ The app helps users track their performance throughout the season and shows impr
 ☑ Users can securely register, log in, and log out. 
 ☑ Passwords are hashed before storage to enhance security. 
 ☑ Duplicate usernames and emails are prevented during registration. 
-☐ Users can securely reset or update their passwords. 
+☑ Users can securely reset or update their passwords. **(Completed)**
 
 ### Club & Season Management 
  
