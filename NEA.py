@@ -137,6 +137,14 @@ def init_db():
     )
     ''')
     
+    # Insert the admin account
+    admin_username = 'Adamhaque27'
+    admin_email = 'adamhaque27@gmail.com'
+    admin_password = hash_password('Cricket2oo7a')
+    cursor.execute('''
+    INSERT OR IGNORE INTO users (username, email, password, is_admin) VALUES (?, ?, ?, 1)
+    ''', (admin_username, admin_email, admin_password))
+    
     # Commit the changes and close the connection
     conn.commit()
     conn.close()
@@ -257,10 +265,16 @@ def update_password(email, new_password):
     conn.commit()
     conn.close()
 
-# Function to clear all data in the database
+# Function to clear all data in the database except the admin account
 def clear_db():
     conn = sqlite3.connect('cricket_tracker.db')
     cursor = conn.cursor()
+    
+    # Retrieve the admin account details
+    cursor.execute('SELECT username, email, password, is_admin FROM users WHERE is_admin=1')
+    admin_account = cursor.fetchone()
+    
+    # Clear all tables
     cursor.execute('DROP TABLE IF EXISTS users')
     cursor.execute('DROP TABLE IF EXISTS clubs')
     cursor.execute('DROP TABLE IF EXISTS seasons')
@@ -270,6 +284,16 @@ def clear_db():
     cursor.execute('DROP TABLE IF EXISTS over_stats')
     cursor.execute('DROP TABLE IF EXISTS reset_tokens')
     cursor.execute('DROP TABLE IF EXISTS club_memberships')
+    
+    # Recreate the tables
+    init_db()
+    
+    # Re-insert the admin account
+    if admin_account:
+        cursor.execute('''
+        INSERT OR REPLACE INTO users (username, email, password, is_admin) VALUES (?, ?, ?, ?)
+        ''', (admin_account[0], admin_account[1], admin_account[2], admin_account[3]))
+    
     conn.commit()
     conn.close()
 
@@ -591,6 +615,27 @@ class SwitchClubScreen(Screen):
         popup = Popup(title='Success', content=Label(text='Switched club successfully'), size_hint=(None, None), size=(400, 200))
         popup.open()
 
+# Class for the admin management screen (admin only)
+class AdminManagementScreen(Screen):
+    def __init__(self, **kwargs):
+        super(AdminManagementScreen, self).__init__(**kwargs)
+        layout = BoxLayout(orientation='vertical')
+        
+        # Button to clear the database
+        clear_db_button = Button(text='Clear Database')
+        clear_db_button.bind(on_press=self.clear_database)
+        layout.add_widget(clear_db_button)
+        
+        # Add other admin functionalities here
+        
+        self.add_widget(layout)
+
+    # Function to clear the database
+    def clear_database(self, instance):
+        clear_db()
+        popup = Popup(title='Success', content=Label(text='Database cleared successfully'), size_hint=(None, None), size=(400, 200))
+        popup.open()
+
 # Main application class
 class CricketApp(App):
     def build(self):
@@ -604,11 +649,12 @@ class CricketApp(App):
         sm.add_widget(SeasonManagementScreen(name='season_management'))
         sm.add_widget(JoinClubScreen(name='join_club'))
         sm.add_widget(SwitchClubScreen(name='switch_club'))
+        sm.add_widget(AdminManagementScreen(name='admin_management'))
         return sm
 
 # Entry point of the application
 if __name__ == '__main__':
-    clear_db()  # Clear any existing data in the database
     init_db()  # Initialise the database
+    clear_db()  # Clear any existing data in the database
     CricketApp().run()  # Run the Kivy application
     print_all_tables()  # Print all tables in the database
